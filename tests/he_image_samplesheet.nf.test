@@ -33,7 +33,8 @@ nextflow_pipeline {
             def ran = workflow.trace.succeeded().collect { it.name }
             assertAll(
                 { assert workflow.success },
-                { assert ran.count { it.contains("ASHLAR") } == 1 }
+                { assert ran.count { it.contains("ASHLAR") } == 1 },
+                { assert path("$outputDir/pipeline_info/histo_software_versions.yml").text.contains('ASHLAR') }
             )
         }
     }

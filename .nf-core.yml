@@ -61,7 +61,8 @@ lint:
   #     collected in workflows/histo.nf. qc does emit versions, but these tests run under
   #     -stub, so the snapshot would pin the stub blocks' literal "stub" strings.
   #
-  # The first three are `nextflow_workflow` tests of a subworkflow. The rest are
+  # The first three are `nextflow_workflow` tests of a subworkflow, register_he a stub
+  # `nextflow_process` test of one module. The rest are
   # `nextflow_function` tests of the input validators, where no process runs at all:
   # they call a Groovy function and assert on what it rejects.
   #
@@ -70,8 +71,11 @@ lint:
     - tests/preprocess_images.nf.test
     - tests/qc.nf.test
     - tests/segmentation.nf.test
+    - tests/register_he.nf.test
     - tests/validate_markersheet.nf.test
     - tests/validate_marker_sheet_column.nf.test
+    - tests/validate_he_image_column.nf.test
+    - tests/he_registration_params.nf.test
     - tests/reject_unknown_params.nf.test
     - tests/reject_spaced_booleans.nf.test
     - tests/reject_string_booleans.nf.test
