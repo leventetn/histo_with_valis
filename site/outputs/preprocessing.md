@@ -75,6 +75,29 @@ The `_backsub` suffix also names the image in the store, so cell ids start with 
 % source: docs/output.md#preprocessing
 % source: site/outputs/outputs.md#what-changes-the-outputs
 
+## H&E registration
+
+`preprocessing/he_registration/{sample}/`, with `use_he_registration` and an `he_image` for the
+sample: the [valis_pipeline](https://github.com/leventetn/valis_registration_pipeline) run that
+registered the H&E onto the stitched image. In it the stitched image is `if` and the H&E `he`.
+
+| File or folder                | Holds                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `config.yml`                  | what was run                                                            |
+| `placement.json`              | the coarse placement: angle, mirroring, gap to the next orientation     |
+| `registration.json`           | VALIS' settings, versions, time and memory                              |
+| `maps/`                       | the point maps of each stage, both directions, in µm                    |
+| `qc/summary.csv`              | automatic landmarks per stage; folds, round trip, movement beyond rigid |
+| `qc/overview_<stage>.jpg`     | IF nuclei in magenta, hematoxylin in green; white where they agree      |
+| `qc/crops_<stage>.jpg`        | nuclei of both images in crops across the tissue                        |
+| `spatialdata/provenance.json` | the map the H&E was pulled through                                      |
+
+The moved H&E is not here: it is the store's `{sample}_he` image. The QC report's "H&E
+registration" section reads this folder.
+
+% source: docs/output.md#preprocessing
+% source: modules/local/register_he/main.nf
+
 ## TMA dearray
 
 `preprocessing/dearray/`, with `use_tma_dearray`: the cores [Coreograph](../modules/coreograph.md)

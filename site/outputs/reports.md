@@ -91,6 +91,22 @@ is in the slide report, not the cores'.
 
 % source: bin/qc_report.py:980-1210
 
+### H&E registration
+
+With `use_he_registration`, for samples with an `he_image`. From the valis_pipeline run in
+`preprocessing/he_registration/{sample}/`: the coarse placement and its gap to the next-best
+orientation, automatic landmarks per stage, how far the non-rigid map moves tissue beyond the
+rigid one, folded tissue, the round trip, and an overview with IF nuclei in magenta and
+hematoxylin in green. **Automatic landmarks measure agreement, not accuracy**: both they and
+VALIS reward image similarity. Only landmarks set by hand measure accuracy.
+
+- **Good:** an unambiguous placement; on one section, tissue moved tens of µm at most beyond the
+  rigid map; no folds; a white overview.
+- **Bad:** an ambiguous placement; 1% of the tissue moved more than 100 µm beyond rigid; magenta
+  and green side by side in the overview. Look at `qc/crops_<stage>.jpg` in the run folder.
+
+% source: bin/qc_report.py
+
 ### Cell area distribution
 
 A histogram of cell areas in px², up to the 99th percentile, with a table of percentiles.
