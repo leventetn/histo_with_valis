@@ -38,6 +38,7 @@ nextflow_workflow {
                     [ id: 'testsample' ],
                     file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                 ])
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -85,6 +86,7 @@ nextflow_workflow {
                     [ id: 'testslide' ],
                     file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                 ])
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -149,6 +151,7 @@ nextflow_workflow {
                     [ id: 'testslide' ],
                     file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                 ])
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -203,6 +206,7 @@ nextflow_workflow {
                     [ id: 'testsample' ],
                     file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                 ])
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -240,6 +244,7 @@ nextflow_workflow {
                     [ id: 'testsample' ],
                     file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                 ])
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -249,6 +254,60 @@ nextflow_workflow {
                 { assert workflow.success },
                 { assert workflow.out.images.size() == 1 },
                 { assert workflow.out.unsubtracted.size() == 0 }
+            )
+        }
+    }
+
+    test("H&E registration runs on Ashlar's image, on the original sheet's first dna channel") {
+
+        // backsub renumbers its sheet; the index must still name the dna channel of Ashlar's image.
+        when {
+            params {
+                use_backsub = true
+                use_tma_dearray = false
+                use_he_registration = true
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    [
+                        [ id: 'testsample', cycle_number: 1 ],
+                        file("\${projectDir}/tests/stub_data/cycle01.ome.tiff", checkIfExists: true),
+                        [],
+                        []
+                    ],
+                    [
+                        [ id: 'other', cycle_number: 1 ],
+                        file("\${projectDir}/tests/stub_data/cycle01.ome.tiff", checkIfExists: true),
+                        [],
+                        []
+                    ]
+                )
+                input[1] = Channel.of(
+                    [ [ id: 'testsample' ], file("\${projectDir}/tests/stub_data/markers_dna_second.csv", checkIfExists: true) ],
+                    [ [ id: 'other' ], file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true) ]
+                )
+                input[2] = Channel.of([
+                    [ id: 'testsample' ],
+                    file("\${projectDir}/tests/stub_data/he.svs", checkIfExists: true)
+                ])
+                """
+            }
+        }
+
+        then {
+            def config = new groovy.json.JsonSlurper().parse(
+                path(workflow.out.he_registration[0][1]).resolve('config.yml').toFile()
+            )
+            assertAll(
+                { assert workflow.success },
+                // Only the sample with an H&E is registered; both are stitched and subtracted.
+                { assert workflow.out.he_registration.size() == 1 },
+                { assert workflow.out.he_registration[0][0].id == 'testsample' },
+                { assert workflow.out.he_image.size() == 1 },
+                { assert workflow.out.images.size() == 2 },
+                // markers_dna_second.csv: AF_bg, then DNA_6.
+                { assert config.reference.channel_index == 1 }
             )
         }
     }
@@ -300,6 +359,7 @@ nextflow_workflow {
                         file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                     ]
                 )
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -352,6 +412,7 @@ nextflow_workflow {
                         file("\${projectDir}/tests/stub_data/markers.csv", checkIfExists: true)
                     ]
                 )
+                input[2] = Channel.empty()
                 """
             }
         }
@@ -398,6 +459,7 @@ nextflow_workflow {
                     [ id: 'testslide' ],
                     file("\${projectDir}/tests/stub_data/markers_dna_second.csv", checkIfExists: true)
                 ])
+                input[2] = Channel.empty()
                 """
             }
         }

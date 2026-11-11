@@ -1,0 +1,90 @@
+// H&E registration end to end under -stub: REGISTER_HE after Ashlar, the writer after
+// segmentation, only for samples with an he_image, and nothing new when it is off.
+// -profile test supplies segmentation params; laptop puts tests/stub_bin on PATH for ashlar.
+
+nextflow_pipeline {
+
+    name "H&E registration"
+    script "../main.nf"
+    profile "test,laptop"
+    options "-stub"
+    tag "stub"
+    tag "pipeline"
+
+    test("of two samples, only the one with an H&E is registered; both are published") {
+
+        when {
+            // Absolute paths, since nf-test launches from its own directory.
+            def data = "$baseDir/tests/stub_data"
+            def sheet = new File("$outputDir", "samplesheet.csv")
+            sheet.parentFile.mkdirs()
+            sheet.text = "sample,cycle_number,image_tiles,marker_sheet,he_image\n" +
+                "testsample,1,${data}/cycle01.ome.tiff,${data}/markers.csv,${data}/he.svs\n" +
+                "testsample,2,${data}/cycle02.ome.tiff,${data}/markers.csv,${data}/he.svs\n" +
+                "other,1,${data}/cycle01.ome.tiff,${data}/markers.csv,\n" +
+                "other,2,${data}/cycle02.ome.tiff,${data}/markers.csv,\n"
+
+            params {
+                outdir = "$outputDir"
+                input = sheet.path
+                use_preprocessing = true
+                cellpose_channels = "DNA_6"
+                use_qc = true
+                use_he_registration = true
+            }
+        }
+
+        then {
+            def ran = workflow.trace.succeeded().collect { it.name }
+            def names = { proc -> ran.findAll { it.contains(proc) } }
+
+            assertAll(
+                { assert workflow.success },
+                { assert names("REGISTER_HE").size() == 1 },
+                { assert names("REGISTER_HE")[0].contains("testsample") },
+                { assert names("ADD_REGISTERED_IMAGE").size() == 1 },
+                { assert names("ADD_REGISTERED_IMAGE")[0].contains("testsample") },
+                // The sample without an H&E is not held back by the join.
+                { assert names("QC_REPORT").size() == 2 },
+                { assert names("PUBLISH_SPATIALDATA").size() == 2 },
+                // log.info reaches only .nextflow.log, which nf-test keeps beside the output.
+                { assert path("$outputDir/../meta/nextflow.log").text.contains("no he_image for other") },
+
+                // The run folder is published; the moved H&E is only in the store.
+                { assert path("$outputDir/preprocessing/he_registration/testsample/qc/summary.csv").exists() },
+                { assert !path("$outputDir/preprocessing/he_registration/testsample_he.ome.tif").exists() },
+                { assert path("$outputDir/pipeline_info/histo_software_versions.yml").text.contains('REGISTER_HE') },
+                { assert path("$outputDir/pipeline_info/histo_software_versions.yml").text.contains('ADD_REGISTERED_IMAGE') }
+            )
+        }
+    }
+
+    test("an he_image column without use_he_registration adds no tasks") {
+
+        when {
+            def data = "$baseDir/tests/stub_data"
+            def sheet = new File("$outputDir", "samplesheet.csv")
+            sheet.parentFile.mkdirs()
+            sheet.text = "sample,cycle_number,image_tiles,marker_sheet,he_image\n" +
+                "testsample,1,${data}/cycle01.ome.tiff,${data}/markers.csv,${data}/he.svs\n"
+
+            params {
+                outdir = "$outputDir"
+                input = sheet.path
+                use_preprocessing = true
+                cellpose_channels = "DNA_6"
+            }
+        }
+
+        then {
+            def ran = workflow.trace.succeeded().collect { it.name }
+            assertAll(
+                { assert workflow.success },
+                { assert ran.count { it.contains("REGISTER_HE") } == 0 },
+                { assert ran.count { it.contains("ADD_REGISTERED_IMAGE") } == 0 },
+                { assert ran.count { it.contains("PUBLISH_SPATIALDATA") } == 1 },
+                { assert path("$outputDir/../meta/nextflow.log").text.contains("use_he_registration is false") }
+            )
+        }
+    }
+}

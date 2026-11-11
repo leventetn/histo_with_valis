@@ -18,6 +18,7 @@ include { PUBLISH_SPATIALDATA     } from '../modules/local/publish_spatialdata'
 include { SEGMENTATION            } from '../subworkflows/local/segmentation'
 include { QC                      } from '../subworkflows/local/qc'
 include { COMPARE_SEGMENTATIONS   } from '../modules/local/compare_segmentations'
+include { ADD_REGISTERED_IMAGE    } from '../modules/local/add_registered_image'
 
 
 include { argsCLI; segmentationSpecs } from '../modules/local/utils'
@@ -48,7 +49,7 @@ workflow HISTO {
     def ch_versions = channel.empty()
 
     if (params.use_preprocessing) {
-        PREPROCESS_IMAGES(ch_samplesheet, ch_markersheet)
+        PREPROCESS_IMAGES(ch_samplesheet, ch_markersheet, ch_he_images)
 
         ch_input_spatialdata = PREPROCESS_IMAGES.out.images.map { meta, image ->
             [addSampleKeys(meta), image, []]
@@ -109,19 +110,43 @@ workflow HISTO {
         ch_segmented = SEGMENTATION.out.sdata
         ch_versions = ch_versions.mix(SEGMENTATION.out.versions)
 
+        // The registered H&E joins its store last: QC, the comparison and the merge read the store
+        // concurrently, so no writer may follow them. Samples without an H&E pass through.
+        if (params.use_he_registration) {
+            def ch_he = PREPROCESS_IMAGES.out.he_image
+                .join(PREPROCESS_IMAGES.out.he_registration)
+                .map { meta, tif, run -> [meta.id, tif, run] }
+            def ch_with_he = ch_segmented
+                .map { meta, sdata -> [meta.id, meta, sdata] }
+                .join(ch_he, remainder: true)
+                // Indexed, not destructured: remainder rows have one null for the missing side.
+                .filter { row -> row[1] != null }
+                .branch { row ->
+                    with_he: row.size() == 5
+                    without: true
+                }
+            ADD_REGISTERED_IMAGE(ch_with_he.with_he.map { _id, meta, sdata, tif, run -> [meta, sdata, tif, run] })
+            ch_versions = ch_versions.mix(ADD_REGISTERED_IMAGE.out.versions)
+            ch_segmented = ADD_REGISTERED_IMAGE.out.sdata.mix(ch_with_he.without.map { row -> [row[1], row[2]] })
+        }
+
         // Ashlar's QC directory, keyed by its own meta.id (sample, or slide on a TMA).
         def ch_registration_qc = params.use_preprocessing
             ? PREPROCESS_IMAGES.out.registration_qc
             : channel.empty()
 
-        // QC needs the aggregated tables. Nothing writes to the store after WRITE_SEGMENTATIONS,
-        // so QC and the merge can read it concurrently.
+        // QC needs the aggregated tables. Nothing writes to the store after WRITE_SEGMENTATIONS
+        // (or ADD_REGISTERED_IMAGE), so QC and the merge can read it concurrently.
         if (params.use_qc) {
             def ch_unsubtracted = params.use_preprocessing
                 ? PREPROCESS_IMAGES.out.unsubtracted
                 : channel.empty()
 
-            QC(ch_segmented, ch_markers, ch_unsubtracted, ch_registration_qc, channel.empty(), specs*.method.unique())
+            def ch_he_registration_qc = params.use_he_registration
+                ? PREPROCESS_IMAGES.out.he_registration
+                : channel.empty()
+
+            QC(ch_segmented, ch_markers, ch_unsubtracted, ch_registration_qc, ch_he_registration_qc, specs*.method.unique())
             ch_versions = ch_versions.mix(QC.out.versions)
 
             // A second opinion when both methods segmented cells; reads the written store beside QC.

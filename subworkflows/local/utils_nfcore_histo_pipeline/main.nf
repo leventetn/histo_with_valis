@@ -166,8 +166,10 @@ workflow PIPELINE_INITIALISATION {
         )
 
         // Only samples that name one; the others run without H&E registration.
+        def he_by_sample = heImagesBySample(cycle_rows)
+        logHeImages(he_by_sample, markerSheetsBySample(cycle_rows).keySet())
         ch_he_images = channel.fromList(
-            heImagesBySample(cycle_rows).collect { sample, he -> [[id: sample], file(he)] }
+            he_by_sample.collect { sample, he -> [[id: sample], file(he)] }
         )
     }
     else {
@@ -299,6 +301,19 @@ def validateHeImageColumn(rows) {
         )
     }
     return rows
+}
+
+// One line each for samples that get no H&E registration, or for an he_image column that is ignored.
+def logHeImages(he_by_sample, samples) {
+    if (params.use_he_registration) {
+        def without = samples.findAll { sample -> !he_by_sample.containsKey(sample) }.sort()
+        if (without) {
+            log.info("use_he_registration: no he_image for ${without.join(', ')}; these run without H&E.")
+        }
+    }
+    else if (he_by_sample) {
+        log.warn("he_image is set for ${he_by_sample.size()} sample(s) but use_he_registration is false: no H&E registration.")
+    }
 }
 
 // Sample name to H&E image, for the samples that name one. Relies on validateHeImageColumn having run.

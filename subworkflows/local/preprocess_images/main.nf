@@ -7,12 +7,14 @@ include { BACKSUB    } from '../../../modules/nf-core/backsub/main'
 include { COREOGRAPH } from '../../../modules/nf-core/coreograph/main'
 include { COREOGRAPH_DETECT } from '../../../modules/local/coreograph_detect/main'
 include { COREOGRAPH_SELECT } from '../../../modules/local/coreograph_select/main'
+include { REGISTER_HE       } from '../../../modules/local/register_he/main'
 include { dearrayChannel    } from '../utils_nfcore_histo_pipeline'
 
 workflow PREPROCESS_IMAGES {
     take:
     ch_cycles // channel: [ val(meta), path(image_tiles), path(dfp), path(ffp) ]
     ch_markersheet // channel: [ val(meta), path(csv) ] one marker sheet per sample, or empty
+    ch_he_images   // channel: [ val(meta), path(he) ] H&E of the same section, only samples that name one
 
     main:
 
@@ -50,6 +52,21 @@ workflow PREPROCESS_IMAGES {
         .set { ch_ashlar }
 
     ASHLAR(ch_ashlar.images, ch_ashlar.dfps, ch_ashlar.ffps)
+
+    // H&E registration on Ashlar's output, beside backsub and segmentation. The index is of
+    // Ashlar's image, so it comes from the original sheet: backsub renumbers its own.
+    if (params.use_he_registration) {
+        ch_register = ASHLAR.out.tif
+            .join(ch_he_images)
+            .join(ch_markersheet.map { meta, sheet -> [meta.subMap('id'), dearrayChannel(sheet.splitCsv(header: true))] })
+        REGISTER_HE(ch_register)
+        ch_he_run = REGISTER_HE.out.run
+        ch_he_image = REGISTER_HE.out.image
+    }
+    else {
+        ch_he_run = channel.empty()
+        ch_he_image = channel.empty()
+    }
 
     // TMA dearray: one slide becomes N cores, each continuing as its own sample.
     // Runs before backsub so the unsubtracted image QC compares against is per core too.
@@ -141,4 +158,6 @@ workflow PREPROCESS_IMAGES {
     markers      = ch_effective_markers  // channel: [ val(meta), path(csv) ] the channels each image actually has
     unsubtracted = ch_unsubtracted    // channel: [ val(meta), path(tif) ] Ashlar's output, pre-subtraction
     registration_qc = ASHLAR.out.qc   // channel: [ val(meta), path(dir) ] Ashlar QC, one per Ashlar task
+    he_registration = ch_he_run       // channel: [ val(meta), path(dir) ] valis_pipeline run folder, samples with an H&E
+    he_image     = ch_he_image        // channel: [ val(meta), path(tif) ] the H&E on Ashlar's pixel grid
 }

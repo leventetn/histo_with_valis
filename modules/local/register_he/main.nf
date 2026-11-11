@@ -13,7 +13,8 @@ process REGISTER_HE {
     output:
     tuple val(meta), path("${meta.id}")              , emit: run
     tuple val(meta), path("${meta.id}_he.ome.tif")   , emit: image
-    path "versions.yml"                              , emit: versions
+    // On the topic: PREPROCESS_IMAGES collects no versions; workflows/histo.nf reads the topic.
+    path "versions.yml"                              , emit: versions, topic: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -49,6 +50,7 @@ process REGISTER_HE {
     stub:
     """
     mkdir -p ${meta.id}/qc ${meta.id}/spatialdata ${meta.id}/maps
+    echo '{"reference": {"name": "if", "channel_index": ${channel_index}}, "moving": {"name": "he"}}' > ${meta.id}/config.yml
     echo '{}' > ${meta.id}/placement.json
     echo '{"state": "complete", "code_version": "stub", "versions": {"valis-wsi": "stub"}}' > ${meta.id}/registration.json
     echo '{"state": "complete", "map_stage": "micro", "mode": "none"}' > ${meta.id}/spatialdata/provenance.json
