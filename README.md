@@ -2,7 +2,8 @@
 
 Processing, segmentation and quantification of multiplex immunofluorescence (mIF) images.
 Input is raw cycles in any format Ashlar reads (Bio-Formats), or a stitched OME-TIFF.
-H&E is planned and not supported.
+An H&E of the same section, scanned after the IF, can be registered onto the stitched IF and added
+to the sample's store (`use_he_registration`, whole slides). H&E-only input is not supported.
 
 > [!WARNING]
 > **Version 2.0.0.** Runs end to end on real data (mIF, TMA, WSI). The samplesheet and marker

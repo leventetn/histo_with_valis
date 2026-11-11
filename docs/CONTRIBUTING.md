@@ -257,6 +257,10 @@ against. The map leaves it out to stay readable.
 For the same reason a second edge is absent: `ASHLAR` also sends its QC directory to
 `QC_REPORT` and, per TMA slide, to `MERGE_REPORT`.
 
+The H&E stations are drawn in line, but `REGISTER_HE` runs on `ASHLAR`'s output beside
+`BACKSUB` and segmentation, and only `ADD_REGISTERED_IMAGE` waits for both. Its run folder also
+reaches `QC_REPORT`.
+
 That ordering is the reason the TMA column of [What runs](output.md#what-runs) lists `COREOGRAPH`
 before `BACKSUB`. The two orders
 produce the same pixels, since subtraction has no whole-slide term, but subtracting first leaves

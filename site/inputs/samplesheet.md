@@ -40,6 +40,9 @@ slide02,1,/data/myproject/raw/slide02/cycle01.ome.tiff,/data/myproject/sheets/ma
   use different sheets, so one run can mix panels.
 - **`dfp`** and **`ffp`**, optional: illumination profiles from an earlier run; see
   [below](#reuse-illumination-profiles).
+- **`he_image`**, optional, with `use_he_registration`: an H&E of the same section, scanned
+  after the IF (`.svs`, `.czi` or `.ome.tif`, one scene per file). Repeat it on every row of the
+  sample, like `marker_sheet`. Keep it the last column.
 
 % source: assets/schema_input_cycle.json
 % source: docs/usage.md#inputs
