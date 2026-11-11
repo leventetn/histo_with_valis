@@ -1202,6 +1202,156 @@ def registration_section(reg: dict[str, Any] | None) -> str:
 """
 
 
+# valis_pipeline's thresholds (place.py search_min_gap, qc.py BEYOND_RIGID_WARN_UM); keep in step with the image.
+HE_MIN_GAP = 0.1
+HE_BEYOND_RIGID_WARN_UM = 100
+HE_STAGES = ("rigid", "nonrigid", "micro")
+
+
+def load_he_registration(run_dir: Path) -> dict[str, Any]:
+    """Read a valis_pipeline run folder (REGISTER_HE), or say why it cannot be used."""
+    summary_csv = run_dir / "qc" / "summary.csv"
+    placement_json = run_dir / "placement.json"
+    if not summary_csv.exists() or not placement_json.exists():
+        return {"available": False, "reason": f"no qc/summary.csv or placement.json in {run_dir.name}"}
+    with summary_csv.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        return {"available": False, "reason": "stub run"}
+    provenance = run_dir / "spatialdata" / "provenance.json"
+    overview = None
+    stage = json.loads(provenance.read_text()).get("map_stage") if provenance.exists() else None
+    if stage and (run_dir / "qc" / f"overview_{stage}.jpg").exists():
+        overview = run_dir / "qc" / f"overview_{stage}.jpg"
+    return {
+        "available": True,
+        "name": run_dir.name,
+        "rows": rows,
+        "placement": json.loads(placement_json.read_text()),
+        "stage": stage,
+        "overview": overview,
+    }
+
+
+def he_registration_section(he: dict[str, Any] | None) -> str:
+    """Render the H&E registration QC: placement, landmark agreement per stage, map checks."""
+    if he is None:
+        return ""
+    if not he.get("available"):
+        return f"""
+<section>
+  <h2>H&amp;E registration</h2>
+  <p class="note">Not computed: {esc(he.get("reason", "unavailable"))}.</p>
+</section>
+"""
+    rows = he["rows"]
+    placement = he["placement"]
+    details_ = placement.get("details", {})
+    stage = he["stage"] or next((s for s in reversed(HE_STAGES) if any(r["stage"] == s for r in rows)), None)
+    by_stage = {r["stage"]: r for r in rows}
+    chosen = by_stage.get(stage, {})
+
+    def fmt(v: Any, spec: str = ".1f") -> str:
+        n = _num(v) if isinstance(v, str) or v is None else v
+        return "–" if n is None else format(n, spec)
+
+    gap = details_.get("gap")
+    beyond = _num(chosen.get("beyond_rigid_tissue_p99_um"))
+    folded = _num(chosen.get("folded_tissue_percent"))
+    status = [
+        status_row(
+            "Coarse placement is unambiguous",
+            gap is None or gap >= HE_MIN_GAP,
+            f"{placement.get('method', '?')} placement"
+            if gap is None
+            else f"best orientation leads the next by {gap:.2f} (ambiguous below {HE_MIN_GAP})",
+        ),
+        status_row(
+            f"Tissue moved within {HE_BEYOND_RIGID_WARN_UM} µm of the rigid map ({stage})",
+            beyond is None or beyond <= HE_BEYOND_RIGID_WARN_UM,
+            "–" if beyond is None else f"1% of the tissue moved more than {beyond:.0f} µm",
+        ),
+        status_row(
+            f"No folded tissue in the map ({stage})",
+            not folded,
+            "–" if folded is None else f"{folded:.2f}% of the tissue folded",
+        ),
+    ]
+    tiles_html = [
+        tile("Map used", stage or "–", "the H&E element is pulled through it"),
+        tile(
+            "Placement",
+            f"{details_['angle_deg']}°{' mirrored' if details_.get('mirrored') else ''}"
+            if "angle_deg" in details_
+            else "–",
+            f"gap {fmt(gap, '.2f')}",
+        ),
+        tile("Beyond rigid p99", "–" if beyond is None else f"{beyond:.0f} µm", "tissue, chosen map"),
+        tile(
+            "Round trip median",
+            f"{fmt(chosen.get('round_trip_tissue_median_um'), '.2f')} µm",
+            "tissue, chosen map",
+        ),
+    ]
+    landmark_rows = [
+        [
+            esc(r["stage"]),
+            esc(r["tier"]),
+            esc(r["direction"]),
+            esc(r["n"]),
+            fmt(r["median_um"], ".2f"),
+            fmt(r["p90_um"], ".2f"),
+            f"{fmt(r['within_5um_percent'], '.0f')}%",
+        ]
+        for r in rows
+        if r.get("source") == "auto"
+    ]
+    landmark_table = (
+        table(
+            ["Stage", "Tier", "Direction", "Points", "Median (µm)", "p90 (µm)", "Within 5 µm"],
+            landmark_rows,
+            "automatic landmarks: agreement, not accuracy",
+        )
+        if landmark_rows
+        else '<p class="note">No automatic landmarks were kept.</p>'
+    )
+    map_rows = [
+        [
+            esc(s),
+            fmt(by_stage[s].get("beyond_rigid_tissue_p99_um"), ".0f"),
+            fmt(by_stage[s].get("folded_tissue_percent"), ".2f"),
+            f"{fmt(by_stage[s].get('round_trip_tissue_median_um'), '.2f')} / "
+            f"{fmt(by_stage[s].get('round_trip_tissue_p95_um'), '.2f')}",
+        ]
+        for s in HE_STAGES
+        if s in by_stage
+    ]
+    map_table = table(
+        ["Stage", "Beyond rigid p99 (µm)", "Folded tissue (%)", "Round trip p50 / p95 (µm)"], map_rows
+    )
+    overview = (
+        f'<div class="gallery">{figure(inline_png(he["overview"]), f"IF nuclei (magenta) and hematoxylin (green), {esc(stage)} map", "white where they agree, yellow where the map folds")}</div>'
+        if he.get("overview")
+        else ""
+    )
+    return f"""
+<section>
+  <h2>H&amp;E registration</h2>
+  <p class="note">The H&amp;E of this section, registered onto the stitched IF by VALIS
+  (valis_pipeline) and stored as its own image on the IF pixel grid. Automatic landmarks
+  measure agreement with an independent patch match, not accuracy: both reward image
+  similarity. On one section, the non-rigid map should move tissue tens of µm at most beyond
+  the rigid one. Full detail in
+  <code>preprocessing/he_registration/{esc(he["name"])}/qc/</code>.</p>
+  <div class="tiles">{"".join(tiles_html)}</div>
+  {"".join(status)}
+  {landmark_table}
+  {map_table}
+  {overview}
+</section>
+"""
+
+
 def figure(src: str, caption: str, sub: str = "") -> str:
     subline = f'<div class="figsub">{sub}</div>' if sub else ""
     return (
@@ -1605,6 +1755,7 @@ def build(
     images: dict[str, Any] | None = None,
     asset_dir: Path | None = None,
     registration: dict[str, Any] | None = None,
+    he_registration: dict[str, Any] | None = None,
 ) -> str:
     img = metrics["image"]
     cells = metrics["cells"]
@@ -1795,6 +1946,8 @@ def build(
 
 {registration_section(registration)}
 
+{he_registration_section(he_registration)}
+
 <section>
   <h2>Cell area distribution</h2>
   <p class="note">{area_note}</p>
@@ -1835,13 +1988,19 @@ def main() -> int:
         type=Path,
         help="Ashlar --qc-output directory; its overlays are inlined like the crops.",
     )
+    ap.add_argument(
+        "--he-registration",
+        type=Path,
+        help="valis_pipeline run folder of the H&E registration; its overview is inlined.",
+    )
     args = ap.parse_args()
 
     metrics = json.loads(args.metrics.read_text())
     images = json.loads(args.images.read_text()) if args.images else None
     asset_dir = args.images.parent if args.images else None
     registration = load_registration(args.registration) if args.registration else None
-    page = build(metrics, images, asset_dir, registration)
+    he_registration = load_he_registration(args.he_registration) if args.he_registration else None
+    page = build(metrics, images, asset_dir, registration, he_registration)
     args.out.write_text(page)
 
     print(f"[qc_report] {args.out} ({len(page.encode()) / 1024:.0f} KB)")

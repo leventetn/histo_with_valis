@@ -121,7 +121,7 @@ workflow HISTO {
                 ? PREPROCESS_IMAGES.out.unsubtracted
                 : channel.empty()
 
-            QC(ch_segmented, ch_markers, ch_unsubtracted, ch_registration_qc, specs*.method.unique())
+            QC(ch_segmented, ch_markers, ch_unsubtracted, ch_registration_qc, channel.empty(), specs*.method.unique())
             ch_versions = ch_versions.mix(QC.out.versions)
 
             // A second opinion when both methods segmented cells; reads the written store beside QC.

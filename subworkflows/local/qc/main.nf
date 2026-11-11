@@ -11,6 +11,7 @@ workflow QC {
     ch_markers       // channel: [ val(meta), path(csv) ], or an empty channel
     ch_unsubtracted  // channel: [ val(meta), path(tif) ], or an empty channel
     ch_registration  // channel: [ val(meta), path(dir) ] Ashlar QC keyed by Ashlar's meta.id, or empty
+    ch_he_registration // channel: [ val(meta), path(dir) ] valis_pipeline run per sample (REGISTER_HE), or empty
     methods          // list: segmentation methods that ran; QC runs once per sample and method
 
     main:
@@ -41,8 +42,15 @@ workflow QC {
     def ch_qc_input = ch_sample_input.flatMap { meta, sdata, tif, markers ->
         methods.collect { method -> [meta + [method: method, table: "${method}_table".toString()], sdata, tif, markers] }
     }
-    def ch_registration_input = ch_sample_registration.flatMap { meta, dir ->
-        methods.collect { method -> [meta + [method: method, table: "${method}_table".toString()], dir] }
+    // The H&E run is per sample, keyed by meta.id like Ashlar's; [] when the sample has none.
+    def ch_sample_he = ch_sample_input
+        .map { meta, _sdata, _tif, _markers -> [meta.id, meta] }
+        .join(ch_he_registration.map { meta, dir -> [meta.id, dir] }, remainder: true)
+        .filter { row -> row[1] != null }
+        .map { row -> [row[1], row.size() > 2 && row[2] ? row[2] : []] }
+
+    def ch_registration_input = ch_sample_registration.join(ch_sample_he).flatMap { meta, dir, he_dir ->
+        methods.collect { method -> [meta + [method: method, table: "${method}_table".toString()], dir, he_dir] }
     }
 
     QC_METRICS(ch_qc_input)
@@ -57,7 +65,7 @@ workflow QC {
         ch_report_input = QC_METRICS.out.metrics.map { meta, metrics -> [meta, metrics, []] }
     }
 
-    // Same meta on both sides, so a plain join; every row has a registration entry ([] if none).
+    // Same meta on both sides, so a plain join; every row has both registration entries ([] if none).
     ch_report_input = ch_report_input.join(ch_registration_input)
 
     QC_REPORT(ch_report_input)
