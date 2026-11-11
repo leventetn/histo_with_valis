@@ -24,6 +24,12 @@
 # tma_core_diameter_mm: null         # Expected core diameter in mm.
 # coreograph_args: null              # Command-line arguments for UNetCoreograph.
 
+## H&E registration
+# use_he_registration: null   # Register each sample's he_image (samplesheet column) onto Ashlar's stitched image and add it to the store as {sample}_he, on the IF pixel grid.
+# he_placement: "search"      # Coarse placement of the H&E before VALIS. search correlates nuclei over all angles, mirrored or not; none uses VALIS' own feature matches. One of: search, none.
+# he_placement_check: "stop"  # What an ambiguous placement does: stop fails the sample's registration and names qc/placement.jpg; skip registers anyway. One of: stop, skip.
+# he_micro_um: "native"       # Pixel of VALIS' micro-registration field in µm, or native for the coarser image's pixel.
+
 ## Institutional config options
 # custom_config_version: "master"   # Git commit id for Institutional configs.
 # custom_config_base: "https://raw.githubusercontent.com/nf-core/configs/master"  # Base directory for Institutional configs.

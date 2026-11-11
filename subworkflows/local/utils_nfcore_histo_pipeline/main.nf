@@ -19,6 +19,7 @@ include { segmentationTargets       } from '../../../modules/local/utils'
 include { defaultInstansegChannels  } from '../../../modules/local/utils'
 include { getChannels               } from '../../../modules/local/utils'
 include { instansegGpuMaxChannels   } from '../../../modules/local/utils'
+include { toNumber                  } from '../../../modules/local/utils'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -729,6 +730,21 @@ def validateParams(params) {
             "tma_expected_cores must be greater than 0. Got: ${params.tma_expected_cores}"
         assert params.tma_core_diameter_mm > 0 :
             "tma_core_diameter_mm must be greater than 0. Got: ${params.tma_core_diameter_mm}"
+    }
+
+    // The H&E is registered onto Ashlar's whole-slide image, on the marker sheet's first dna
+    // channel, and added to the sample's store.
+    if (params.use_he_registration) {
+        assert params.use_preprocessing : "use_he_registration requires use_preprocessing: the " +
+            "registration channel comes from the marker sheet, which pre-stitched input does not have."
+        assert !params.use_tma_dearray : "use_he_registration with use_tma_dearray: TMA slides are " +
+            "not supported yet. Register whole slides only, or set use_he_registration to false."
+        assert !params.preprocessing_only : "use_he_registration with preprocessing_only: the H&E " +
+            "is added to the sample's store, which preprocessing_only does not make."
+        if (params.he_micro_um != 'native') {
+            def micro = toNumber('he_micro_um', params.he_micro_um)
+            assert micro > 0 : "he_micro_um must be native or a number of µm greater than 0. Got: ${params.he_micro_um}"
+        }
     }
 
     // QC clusters on the mean, and a repeated statistic would write duplicate columns.
