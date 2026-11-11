@@ -105,16 +105,17 @@ workflow PIPELINE_INITIALISATION {
     def cycle_rows = null
 
     if (params.use_preprocessing) {
-        // Rows are [meta, image_tiles, dfp, ffp, marker_sheet], in schema property order.
+        // Rows are [meta, image_tiles, dfp, ffp, marker_sheet, he_image], in schema property order.
         cycle_rows = samplesheetToList(params.input, "${projectDir}/assets/schema_input_cycle.json")
 
         validateIlluminationColumns(cycle_rows)
         validateCycleNumbers(cycle_rows)
         validateMarkerSheetColumn(cycle_rows)
+        validateHeImageColumn(cycle_rows)
 
         Channel
             .fromList(cycle_rows)
-            .map { meta, image_tiles, dfp, ffp, _marker_sheet ->
+            .map { meta, image_tiles, dfp, ffp, _marker_sheet, _he_image ->
                 // sdata_dir and marker_sheet are per sample, so both are attached after stitching
                 // (marker_sheet via ch_markersheet).
                 [meta, image_tiles, dfp, ffp]
@@ -162,15 +163,22 @@ workflow PIPELINE_INITIALISATION {
         ch_markersheet = channel.fromList(
             sheets_by_sample.collect { sample, sheet -> [[id: sample], file(sheet)] }
         )
+
+        // Only samples that name one; the others run without H&E registration.
+        ch_he_images = channel.fromList(
+            heImagesBySample(cycle_rows).collect { sample, he -> [[id: sample], file(he)] }
+        )
     }
     else {
         // Pre-stitched images are assumed to carry their own channel names.
         ch_markersheet = channel.empty()
+        ch_he_images = channel.empty()
     }
 
     emit:
     samplesheet = ch_samplesheet
     markersheet = ch_markersheet
+    he_images = ch_he_images
     versions = ch_versions
 }
 
@@ -276,6 +284,25 @@ def validateMarkerSheetColumn(rows) {
 // Sample name to marker sheet. Relies on validateMarkerSheetColumn having run.
 def markerSheetsBySample(rows) {
     return rows.collectEntries { row -> [(row[0].id): row[4]] }
+}
+
+// he_image repeats on every cycle row of a sample, like marker_sheet; all copies must agree,
+// and a sample names it on every row or on none.
+def validateHeImageColumn(rows) {
+    rows.groupBy { it[0].id }.each { sample, cycles ->
+        def images = cycles.collect { it[5] ? it[5] as String : '(empty)' }.unique()
+        assert images.size() == 1 : (
+            "Sample '${sample}': every cycle must name the same he_image, or none. Found " +
+            "${images.size()}: ${images}. The H&E is registered onto the whole stitched " +
+            "image rather than one cycle of it, so a sample can only have one."
+        )
+    }
+    return rows
+}
+
+// Sample name to H&E image, for the samples that name one. Relies on validateHeImageColumn having run.
+def heImagesBySample(rows) {
+    return rows.findAll { row -> row[5] }.collectEntries { row -> [(row[0].id): row[5]] }
 }
 
 // Marker sheet checks that JSON Schema cannot express.

@@ -40,6 +40,7 @@ workflow HISTO {
     take:
     ch_samplesheet // channel: samplesheet read in from --input
     ch_markersheet // channel: [ val(meta), path(csv) ] one marker sheet per sample
+    ch_he_images   // channel: [ val(meta), path(he) ] H&E of the same section, only samples that name one
     outdir
 
     main:

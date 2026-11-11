@@ -1,0 +1,64 @@
+// The he_image samplesheet column end to end under -stub: read by the schema, rejected with a
+// clear message when it is not an H&E file. Its cross-row check is validate_he_image_column.nf.test.
+// -profile laptop puts tests/stub_bin on PATH for the ashlar eval() version shim.
+
+nextflow_pipeline {
+
+    name "he_image column"
+    script "../main.nf"
+    profile "laptop"
+    options "-stub"
+    tag "stub"
+    tag "pipeline"
+
+    test("a samplesheet with he_image runs as one without") {
+
+        when {
+            // Absolute paths, since nf-test launches from its own directory.
+            def data = "$baseDir/tests/stub_data"
+            def sheet = new File("$outputDir", "samplesheet.csv")
+            sheet.parentFile.mkdirs()
+            sheet.text = "sample,cycle_number,image_tiles,marker_sheet,he_image\n" +
+                "testsample,1,${data}/cycle01.ome.tiff,${data}/markers.csv,${data}/he.svs\n" +
+                "testsample,2,${data}/cycle02.ome.tiff,${data}/markers.csv,${data}/he.svs\n"
+
+            params {
+                outdir = "$outputDir"
+                input = sheet.path
+                preprocessing_only = true
+            }
+        }
+
+        then {
+            def ran = workflow.trace.succeeded().collect { it.name }
+            assertAll(
+                { assert workflow.success },
+                { assert ran.count { it.contains("ASHLAR") } == 1 }
+            )
+        }
+    }
+
+    test("an he_image that is not an H&E file is rejected") {
+
+        when {
+            def data = "$baseDir/tests/stub_data"
+            def sheet = new File("$outputDir", "samplesheet.csv")
+            sheet.parentFile.mkdirs()
+            sheet.text = "sample,cycle_number,image_tiles,marker_sheet,he_image\n" +
+                "testsample,1,${data}/cycle01.ome.tiff,${data}/markers.csv,${data}/markers.csv\n"
+
+            params {
+                outdir = "$outputDir"
+                input = sheet.path
+                preprocessing_only = true
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert (workflow.stdout + workflow.stderr).any { it.contains("he_image must be an existing .svs, .czi, .ome.tif or .ome.tiff file") } }
+            )
+        }
+    }
+}
