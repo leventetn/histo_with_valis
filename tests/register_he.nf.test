@@ -1,0 +1,42 @@
+// REGISTER_HE under -stub: the run folder and the moved H&E come out, keyed by the sample.
+// The real run needs the valis_pipeline image; its outputs are checked on the cluster (mDVP15).
+
+nextflow_process {
+
+    name "REGISTER_HE"
+    script "../modules/local/register_he/main.nf"
+    process "REGISTER_HE"
+    profile "laptop"
+    options "-stub"
+    tag "stub"
+
+    test("one sample gives its run folder and the H&E on the IF grid") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'testsample' ],
+                    file("\${projectDir}/tests/stub_data/cycle01.ome.tiff", checkIfExists: true),
+                    file("\${projectDir}/tests/stub_data/he.svs", checkIfExists: true),
+                    0
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert process.out.run.size() == 1 },
+                { assert process.out.run[0][0].id == 'testsample' },
+                { assert process.out.run[0][1].endsWith('/testsample') },
+                // What ADD_REGISTERED_IMAGE and the QC report read.
+                { assert path(process.out.run[0][1]).resolve('qc/summary.csv').exists() },
+                { assert path(process.out.run[0][1]).resolve('registration.json').exists() },
+                { assert path(process.out.run[0][1]).resolve('spatialdata/provenance.json').exists() },
+                { assert process.out.image[0][1].endsWith('testsample_he.ome.tif') }
+            )
+        }
+    }
+}
