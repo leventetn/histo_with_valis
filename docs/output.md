@@ -54,6 +54,9 @@ Variations not in the table:
 - `preprocessing_only` ends every path at the preprocessing outputs.
 - `use_projection` adds `PROJECT_CHANNELS` before `MAKE_IMAGE_PATCHES`; Cellpose segments the
   projection, and `WRITE_SEGMENTATIONS` removes it unless `keep_projection`.
+- `use_he_registration` adds, for each sample with an `he_image`, `REGISTER_HE` on Ashlar's
+  output (beside backsub and segmentation) and `ADD_REGISTERED_IMAGE` after
+  `WRITE_SEGMENTATIONS`, the last write to the store. Whole slides only.
 
 ## Pipeline overview
 
@@ -94,6 +97,16 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and outputs the
     CSV is backsub's own marker sheet rather than a copy of the input: rows whose `remove` column
     was set are gone and `channel_number` is renumbered over what survives, so this is the sheet
     that describes the image everything downstream reads.
+- `preprocessing/he_registration/{sample}/`
+  - With `use_he_registration`, for each sample with an `he_image`: the
+    [valis_pipeline](https://github.com/leventetn/valis_registration_pipeline) run that
+    registered the H&E onto `{sample}.ome.tif` (named `if` in it; the H&E is `he`).
+    `config.yml` is what was run; `placement.json` the coarse placement (angle, mirroring, and
+    the gap to the next-best orientation); `registration.json` VALIS' settings, versions, time
+    and memory; `maps/` the point maps of each stage in both directions, in µm; `qc/`
+    `summary.csv`, the automatic landmarks, and an overview and crops per stage;
+    `spatialdata/provenance.json` the map the H&E was pulled through. VALIS' working folder and
+    converted inputs are deleted. The moved H&E itself is only in the store.
 - `preprocessing/dearray/`
   - `{slide}_core001.ome.tif` and one per core, plus `masks/{slide}_core001_mask.tif`,
     `{slide}_coremask.tif`, `{slide}_tma_map.tif` and `{slide}_centroids.txt`. Only when
@@ -122,7 +135,10 @@ HTML report then, so `{sample}_ashlar_qc/{sample}_ashlar_report.pdf` is where to
 
 - `{sample}.zarr/`, per method `{m}` (`cellpose`, `instanseg`):
   - `images/`: the image. With `keep_projection`, also `<image>_projected`: the `nuclear` and
-    `cell` channels Cellpose segmented, at full resolution.
+    `cell` channels Cellpose segmented, at full resolution. With `use_he_registration`, also
+    `{sample}_he`: the H&E (channels `r`, `g`, `b`, uint8) on the image's pixel grid, with the
+    image's transformation. The store attribute `he_registration` records the valis_pipeline
+    version, the map, both pixel sizes, the placement and the published run folder.
   - `shapes/{m}_cells` (`segment_cells`): cell polygons, indexed by cell id.
   - `shapes/{m}_nuclei` (`segment_nuclei`): nucleus polygons. With both targets, its
     `linked_cell_id` names the cell holding at least half of the nucleus; null if none.
@@ -247,6 +263,12 @@ shifted mask in 1.x, so their intensities change ([CHANGELOG](https://github.com
     whether every tile pair aligned, whether the mosaic is one connected piece, how many tiles
     each cycle discarded and why, the residual misalignment per cycle, and the cycle overlays.
     See [usage.md](usage.md#when-stitching-or-registration-looks-wrong) for what to change.
+- H&E registration QC
+  - Not copied into `qc/`: the report's "H&E registration" section reads
+    `preprocessing/he_registration/{sample}/` (above). It shows the placement, the automatic
+    landmarks per stage (agreement with an independent patch match, not accuracy), how far the
+    non-rigid map moves tissue beyond the rigid one (flagged above 100 µm, as on one section it
+    should stay at tens of µm), folds, the round trip, and the overview.
 - `qc/{sample}_projection.png` and `qc/{sample}_projection.json`
   - **With `use_projection` only.** The two channels Cellpose segmented, downsampled, nuclear in
     magenta and cell in green; and the markers in each, their rescaling bounds, the share of

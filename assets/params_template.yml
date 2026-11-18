@@ -152,6 +152,52 @@
 
 
 ## =============================================================================
+## H&E registration
+## =============================================================================
+## Register an H&E of the same section, scanned after the IF, onto the
+## stitched IF with VALIS (valis_pipeline), and add it to the sample's store
+## as {sample}_he.
+
+## -----------------------------------------------------------------------------
+## use_he_registration
+## -----------------------------------------------------------------------------
+##     Register each sample's he_image (samplesheet column) onto Ashlar's
+##     stitched image and add it to the store as {sample}_he, on the IF pixel
+##     grid. Samples without he_image run as before.
+##     Type: boolean
+## -----------------------------------------------------------------------------
+# use_he_registration: null
+
+## -----------------------------------------------------------------------------
+## he_placement
+## -----------------------------------------------------------------------------
+##     Coarse placement of the H&E before VALIS. search correlates nuclei
+##     over all angles, mirrored or not; none uses VALIS' own feature
+##     matches.
+##     Type: string
+## -----------------------------------------------------------------------------
+# he_placement: "search"
+
+## -----------------------------------------------------------------------------
+## he_placement_check
+## -----------------------------------------------------------------------------
+##     What an ambiguous placement does: stop fails the sample's registration
+##     and names qc/placement.jpg; skip registers anyway.
+##     Type: string
+## -----------------------------------------------------------------------------
+# he_placement_check: "stop"
+
+## -----------------------------------------------------------------------------
+## he_micro_um
+## -----------------------------------------------------------------------------
+##     Pixel of VALIS' micro-registration field in µm, or native for the
+##     coarser image's pixel.
+##     Type: ['string', 'number']
+## -----------------------------------------------------------------------------
+# he_micro_um: "native"
+
+
+## =============================================================================
 ## Institutional config options
 ## =============================================================================
 ## Parameters used to describe centralised config profiles. These should not

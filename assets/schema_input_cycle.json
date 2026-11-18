@@ -53,6 +53,14 @@
                 "pattern": "^\\S+\\.csv$",
                 "description": "Path to the marker sheet for this sample, one row per channel. Every cycle row of a sample must name the same file: the sheet describes the whole stitched image, not one cycle of it. Two samples may name different sheets, which is the point of the column.",
                 "errorMessage": "marker_sheet must be an existing .csv file without spaces"
+            },
+            "he_image": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.(svs|czi|ome\\.tiff?)$",
+                "description": "Optional brightfield H&E of the same section, scanned after the IF, registered onto the stitched IF with use_he_registration. One scene per file. Every cycle row of a sample must name the same file. Keep this column last: rows are read by position.",
+                "errorMessage": "he_image must be an existing .svs, .czi, .ome.tif or .ome.tiff file without spaces"
             }
         },
         "required": ["sample", "cycle_number", "image_tiles", "marker_sheet"],

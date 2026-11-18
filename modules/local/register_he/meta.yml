@@ -1,0 +1,48 @@
+name: register_he
+description: Register a same-section H&E onto the stitched IF with valis_pipeline (VALIS), and pull it onto the IF pixel grid
+keywords:
+  - registration
+  - h&e
+  - valis
+tools:
+  - valis_pipeline:
+      description: Whole-slide registration with VALIS 1.2.0, from raw inputs to point maps and QC
+      homepage: https://github.com/leventetn/valis_registration_pipeline
+input:
+  - - meta:
+        type: map
+        description: Sample information, e.g. [ id:'sample1' ]
+    - ifimage:
+        type: file
+        description: Ashlar's stitched OME-TIFF
+        pattern: "*.ome.tif"
+    - heimage:
+        type: file
+        description: H&E of the same section, scanned after the IF
+        pattern: "*.{svs,czi,ome.tif,ome.tiff}"
+    - channel_index:
+        type: integer
+        description: 0-based index of the IF's nuclear channel (the marker sheet's first dna channel)
+output:
+  run:
+    - - meta:
+          type: map
+          description: Sample information
+      - ${meta.id}:
+          type: directory
+          description: valis_pipeline run folder (config, placement, registration record, maps, QC), without VALIS' working folder
+  image:
+    - - meta:
+          type: map
+          description: Sample information
+      - ${meta.id}_he.ome.tif:
+          type: file
+          description: The H&E on the IF pixel grid, RGB pyramid OME-TIFF
+          pattern: "*_he.ome.tif"
+  versions:
+    - versions.yml:
+        type: file
+        description: valis-wsi and valis_pipeline versions
+        pattern: "versions.yml"
+authors:
+  - "@leventetn"

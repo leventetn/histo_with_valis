@@ -109,6 +109,42 @@
                 }
             }
         },
+        "he_registration": {
+            "title": "H&E registration",
+            "type": "object",
+            "description": "Register an H&E of the same section, scanned after the IF, onto the stitched IF with VALIS (valis_pipeline), and add it to the sample's store as {sample}_he.",
+            "default": "",
+            "fa_icon": "fas fa-object-group",
+            "properties": {
+                "use_he_registration": {
+                    "type": "boolean",
+                    "description": "Register each sample's he_image (samplesheet column) onto Ashlar's stitched image and add it to the store as {sample}_he, on the IF pixel grid. Samples without he_image run as before.",
+                    "help_text": "Runs on Ashlar's output, on the first `dna` channel of the marker sheet. Same-section H&E only; serial sections are not supported.\n\n**Requires:** `use_preprocessing` and the `he_image` samplesheet column. **Conflicts:** `use_tma_dearray`, `preprocessing_only`.",
+                    "fa_icon": "fas fa-toggle-off"
+                },
+                "he_placement": {
+                    "type": "string",
+                    "default": "search",
+                    "enum": ["search", "none"],
+                    "description": "Coarse placement of the H&E before VALIS. search correlates nuclei over all angles, mirrored or not; none uses VALIS' own feature matches.",
+                    "help_text": "`none` is untested for H&E against IF.\n\n**Ignored unless:** `use_he_registration` is true."
+                },
+                "he_placement_check": {
+                    "type": "string",
+                    "default": "stop",
+                    "enum": ["stop", "skip"],
+                    "description": "What an ambiguous placement does: stop fails the sample's registration and names qc/placement.jpg; skip registers anyway.",
+                    "help_text": "**Ignored unless:** `use_he_registration` is true and `he_placement` is `search`."
+                },
+                "he_micro_um": {
+                    "type": ["string", "number"],
+                    "default": "native",
+                    "pattern": "^(native|[0-9]*\\.?[0-9]+)$",
+                    "description": "Pixel of VALIS' micro-registration field in µm, or native for the coarser image's pixel.",
+                    "help_text": "**Ignored unless:** `use_he_registration` is true."
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -499,6 +535,9 @@
         },
         {
             "$ref": "#/$defs/preprocessing"
+        },
+        {
+            "$ref": "#/$defs/he_registration"
         },
         {
             "$ref": "#/$defs/institutional_config_options"

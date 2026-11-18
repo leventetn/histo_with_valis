@@ -46,6 +46,12 @@ Both are MIT licensed. This pipeline would not exist without them.
   The pipeline runs a fork, [josenimo/ashlar](https://github.com/josenimo/ashlar) (branch
   `histo-qc`), which adds rotation correction and machine-readable QC; cite the paper above.
 
+- [VALIS](https://www.nature.com/articles/s41467-023-40218-9) — registration of the H&E onto the
+  stitched IF, under `use_he_registration`, run through
+  [valis_pipeline](https://github.com/leventetn/valis_registration_pipeline)
+
+  > Gatenbee CD, Baker AM, Prabhakaran S, Swinyard O, Slebos RJC, Mandal G, Mulholland E, Andor N, Marusyk A, Leedham S, Conejo-Garcia JR, Chung CH, Robertson-Tessi M, Graham TA, Anderson ARA. Virtual alignment of pathology image series for multi-gigapixel whole slide images. Nat Commun 14, 4502 (2023). https://doi.org/10.1038/s41467-023-40218-9
+
 - [background_subtraction](https://github.com/SchapiroLabor/Background_subtraction) — pixel-level
   background subtraction, from the Schapiro Lab
 

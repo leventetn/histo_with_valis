@@ -6,6 +6,8 @@
 %%metro marker: PROJECT_CHANNELS | circle, #cccccc
 %%metro marker: LINK_COMPARTMENTS | circle, #cccccc
 %%metro marker: COMPARE_SEGMENTATIONS | circle, #cccccc
+%%metro marker: REGISTER_HE | circle, #cccccc
+%%metro marker: ADD_REGISTERED_IMAGE | circle, #cccccc
 %%metro marker_legend: circle, #cccccc | Optional step
 %%metro grid: preprocessing | 0,0
 %%metro grid: store | 1,0
@@ -19,11 +21,13 @@ graph LR
         BASICPY([Illumination (BaSiCPy)])
         ASHLAR([Stitch + register (Ashlar)])
         COREOGRAPH([TMA dearray (Coreograph)])
+        REGISTER_HE([H&E registration (VALIS)])
         BACKSUB([Background subtraction])
 
         BASICPY -->|wsi, tma| ASHLAR
         ASHLAR -->|tma| COREOGRAPH
-        ASHLAR -->|wsi| BACKSUB
+        ASHLAR -->|wsi| REGISTER_HE
+        REGISTER_HE -->|wsi| BACKSUB
         COREOGRAPH -->|tma| BACKSUB
     end
 
@@ -49,9 +53,11 @@ graph LR
         %%metro direction: RL
         %%metro entry: right | wsi, tma
         %%metro exit: left | wsi, tma
+        ADD_REGISTERED_IMAGE([Add H&E to store])
         MERGE_SPATIALDATA([Merge cores per slide])
         PUBLISH_SPATIALDATA([Publish SpatialData])
 
+        ADD_REGISTERED_IMAGE -->|wsi| PUBLISH_SPATIALDATA
         MERGE_SPATIALDATA -->|tma| PUBLISH_SPATIALDATA
     end
 
@@ -70,7 +76,7 @@ graph LR
     BACKSUB -->|wsi, tma| TO_SPATIALDATA
     TO_SPATIALDATA -->|wsi, tma| PROJECT_CHANNELS
     TO_SPATIALDATA -->|wsi, tma| SEGMENT_PATCH_INSTANSEG
-    AGGREGATE -->|wsi| PUBLISH_SPATIALDATA
+    AGGREGATE -->|wsi| ADD_REGISTERED_IMAGE
     AGGREGATE -->|tma| MERGE_SPATIALDATA
     PUBLISH_SPATIALDATA -->|wsi, tma| QC_METRICS
 
@@ -80,5 +86,6 @@ graph LR
     %%   TO_SPATIALDATA   TO_SPATIALDATA, SET_CHANNEL_NAMES, MAKE_IMAGE_PATCHES
     %%   AGGREGATE        RESOLVE, AGGREGATE, WRITE_SEGMENTATIONS
     %%   QC_METRICS       QC_METRICS, QC_IMAGES
-    %% Schematic, not wiring: QC reads the store alongside publishing, not after it.
+    %% Schematic, not wiring: QC reads the store alongside publishing, not after it, and
+    %% REGISTER_HE runs on Ashlar's output beside backsub and segmentation, not before them.
     %% Edges left out are described in docs/CONTRIBUTING.md#what-the-map-leaves-out.

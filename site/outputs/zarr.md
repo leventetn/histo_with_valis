@@ -16,7 +16,8 @@ single file. To read it in Python, see
 {sample}.zarr/
 ├── images/
 │   ├── <image>            the image, channels named from the marker sheet
-│   └── <image>_projected  with keep_projection: the nuclear and cell channels Cellpose saw
+│   ├── <image>_projected  with keep_projection: the nuclear and cell channels Cellpose saw
+│   └── {sample}_he        with use_he_registration: the H&E (r, g, b) on the image's pixel grid
 ├── shapes/
 │   ├── image_patches      the patch grid segmentation ran on
 │   ├── region_of_interest with use_tissue_segmentation: the tissue outline
@@ -32,6 +33,8 @@ single file. To read it in Python, see
 - `{m}_cytoplasm` holds only cells with some cytoplasm left.
 - The `<image>` name is the sample's, with `_backsub` after background subtraction.
 - With pre-stitched input, channel names are the image's own.
+- `{sample}_he` shares the image's pixel grid and transformation, so shapes and cell ids apply to
+  it as they are. The store attribute `he_registration` says how it was registered.
 
 % source: docs/output.md#spatialdata-directory
 % source: site/outputs/outputs.md#what-changes-the-outputs

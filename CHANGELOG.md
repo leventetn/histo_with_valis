@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   area, perimeter, circularity, solidity, eccentricity and axis lengths, in px.
 - `nc_ratio`, `nucleus_area / cell_area`.
 - `uns['quantification']`: the statistics, `tile_size` and the largest read window.
+- `use_he_registration` and the samplesheet column `he_image`: an H&E of the same section is
+  registered onto Ashlar's stitched image with VALIS (`REGISTER_HE`, the valis_pipeline image)
+  and added to the store as `{sample}_he` on the IF pixel grid (`ADD_REGISTERED_IMAGE`). The run
+  folder is published to `preprocessing/he_registration/{sample}/`, and the QC report gets an
+  "H&E registration" section. Whole slides only; off by default.
 
 ### Changed
 

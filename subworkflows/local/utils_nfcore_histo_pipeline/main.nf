@@ -19,6 +19,7 @@ include { segmentationTargets       } from '../../../modules/local/utils'
 include { defaultInstansegChannels  } from '../../../modules/local/utils'
 include { getChannels               } from '../../../modules/local/utils'
 include { instansegGpuMaxChannels   } from '../../../modules/local/utils'
+include { toNumber                  } from '../../../modules/local/utils'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,16 +106,17 @@ workflow PIPELINE_INITIALISATION {
     def cycle_rows = null
 
     if (params.use_preprocessing) {
-        // Rows are [meta, image_tiles, dfp, ffp, marker_sheet], in schema property order.
+        // Rows are [meta, image_tiles, dfp, ffp, marker_sheet, he_image], in schema property order.
         cycle_rows = samplesheetToList(params.input, "${projectDir}/assets/schema_input_cycle.json")
 
         validateIlluminationColumns(cycle_rows)
         validateCycleNumbers(cycle_rows)
         validateMarkerSheetColumn(cycle_rows)
+        validateHeImageColumn(cycle_rows)
 
         Channel
             .fromList(cycle_rows)
-            .map { meta, image_tiles, dfp, ffp, _marker_sheet ->
+            .map { meta, image_tiles, dfp, ffp, _marker_sheet, _he_image ->
                 // sdata_dir and marker_sheet are per sample, so both are attached after stitching
                 // (marker_sheet via ch_markersheet).
                 [meta, image_tiles, dfp, ffp]
@@ -162,15 +164,24 @@ workflow PIPELINE_INITIALISATION {
         ch_markersheet = channel.fromList(
             sheets_by_sample.collect { sample, sheet -> [[id: sample], file(sheet)] }
         )
+
+        // Only samples that name one; the others run without H&E registration.
+        def he_by_sample = heImagesBySample(cycle_rows)
+        logHeImages(he_by_sample, markerSheetsBySample(cycle_rows).keySet())
+        ch_he_images = channel.fromList(
+            he_by_sample.collect { sample, he -> [[id: sample], file(he)] }
+        )
     }
     else {
         // Pre-stitched images are assumed to carry their own channel names.
         ch_markersheet = channel.empty()
+        ch_he_images = channel.empty()
     }
 
     emit:
     samplesheet = ch_samplesheet
     markersheet = ch_markersheet
+    he_images = ch_he_images
     versions = ch_versions
 }
 
@@ -276,6 +287,38 @@ def validateMarkerSheetColumn(rows) {
 // Sample name to marker sheet. Relies on validateMarkerSheetColumn having run.
 def markerSheetsBySample(rows) {
     return rows.collectEntries { row -> [(row[0].id): row[4]] }
+}
+
+// he_image repeats on every cycle row of a sample, like marker_sheet; all copies must agree,
+// and a sample names it on every row or on none.
+def validateHeImageColumn(rows) {
+    rows.groupBy { it[0].id }.each { sample, cycles ->
+        def images = cycles.collect { it[5] ? it[5] as String : '(empty)' }.unique()
+        assert images.size() == 1 : (
+            "Sample '${sample}': every cycle must name the same he_image, or none. Found " +
+            "${images.size()}: ${images}. The H&E is registered onto the whole stitched " +
+            "image rather than one cycle of it, so a sample can only have one."
+        )
+    }
+    return rows
+}
+
+// One line each for samples that get no H&E registration, or for an he_image column that is ignored.
+def logHeImages(he_by_sample, samples) {
+    if (params.use_he_registration) {
+        def without = samples.findAll { sample -> !he_by_sample.containsKey(sample) }.sort()
+        if (without) {
+            log.info("use_he_registration: no he_image for ${without.join(', ')}; these run without H&E.")
+        }
+    }
+    else if (he_by_sample) {
+        log.warn("he_image is set for ${he_by_sample.size()} sample(s) but use_he_registration is false: no H&E registration.")
+    }
+}
+
+// Sample name to H&E image, for the samples that name one. Relies on validateHeImageColumn having run.
+def heImagesBySample(rows) {
+    return rows.findAll { row -> row[5] }.collectEntries { row -> [(row[0].id): row[5]] }
 }
 
 // Marker sheet checks that JSON Schema cannot express.
@@ -702,6 +745,21 @@ def validateParams(params) {
             "tma_expected_cores must be greater than 0. Got: ${params.tma_expected_cores}"
         assert params.tma_core_diameter_mm > 0 :
             "tma_core_diameter_mm must be greater than 0. Got: ${params.tma_core_diameter_mm}"
+    }
+
+    // The H&E is registered onto Ashlar's whole-slide image, on the marker sheet's first dna
+    // channel, and added to the sample's store.
+    if (params.use_he_registration) {
+        assert params.use_preprocessing : "use_he_registration requires use_preprocessing: the " +
+            "registration channel comes from the marker sheet, which pre-stitched input does not have."
+        assert !params.use_tma_dearray : "use_he_registration with use_tma_dearray: TMA slides are " +
+            "not supported yet. Register whole slides only, or set use_he_registration to false."
+        assert !params.preprocessing_only : "use_he_registration with preprocessing_only: the H&E " +
+            "is added to the sample's store, which preprocessing_only does not make."
+        if (params.he_micro_um != 'native') {
+            def micro = toNumber('he_micro_um', params.he_micro_um)
+            assert micro > 0 : "he_micro_um must be native or a number of µm greater than 0. Got: ${params.he_micro_um}"
+        }
     }
 
     // QC clusters on the mean, and a repeated statistic would write duplicate columns.

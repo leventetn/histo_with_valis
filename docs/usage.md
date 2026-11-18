@@ -91,6 +91,21 @@ the log warns when even the best factor is off by more than 10 % in count or 25 
 To run Coreograph exactly as you say instead, set `coreograph_args`, for example
 `'--downsampleFactor 4 --channel 0 --buffer 2'`. The sweep is then skipped.
 
+### H&E of the same section
+
+With `use_he_registration: true`, an optional `he_image` column names, per sample, an H&E of the
+same section scanned after the IF (`.svs`, `.czi` or `.ome.tif`, one scene per file). Like
+`marker_sheet`, it repeats on every cycle row of the sample. Samples without it run as before;
+the log names them.
+
+The H&E is registered with [VALIS](https://github.com/MathOnco/valis) onto Ashlar's stitched
+image, on the marker sheet's first `dna` channel, and added to the store as `{sample}_he`, on
+the IF pixel grid. It runs beside background subtraction and segmentation, in the image
+`docker.io/leventetn/valis_pipeline`. `he_placement` (`search`, nuclei at every angle, or `none`)
+sets the coarse placement; with `he_placement_check: stop`, an ambiguous one stops that sample's
+registration and names `qc/placement.jpg` to look at. Then rerun with `skip` if the placement is
+right. Not with `use_tma_dearray`, pre-stitched input or `preprocessing_only`.
+
 ### When stitching or registration looks wrong
 
 Open the "Stitching and registration" section of the QC report (the slide report on a TMA),
